@@ -17,8 +17,7 @@ const signatures=Object.freeze({
   record_feedback:[
     ['p_session_id','uuid'],['p_attempt_id','uuid'],['p_liked_result','boolean'],
     ['p_wants_change','boolean'],['p_desired_letter','text']
-  ],
-  delete_session_data:[['p_session_id','uuid'],['p_deletion_token_hash','text']]
+  ]
 });
 
 /**
