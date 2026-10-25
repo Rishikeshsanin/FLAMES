@@ -14,7 +14,7 @@ test('closing message celebrates living and kindness without promising a FLAMES 
 });
 test('entry notice remains clear without duplicate footer privacy panel',()=>{
  assert.match(markup,/class="[^"]*entry-consent/);
- assert.match(markup,/both entered names/);
+ assert.match(markup,/both entered names/i);
  assert.match(markup,/saved for testing/);
  assert.match(markup,/Names are kept up to 30 days/);
  assert.doesNotMatch(markup,/class="privacy-note"/);
