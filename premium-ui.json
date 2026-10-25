@@ -1,0 +1,5 @@
+{
+  "profile": "consumer",
+  "sourceRoots": ["index.html", "styles.css", "privacy.css", "app.mjs"],
+  "ownership": {"Select/Listbox": "native"}
+}

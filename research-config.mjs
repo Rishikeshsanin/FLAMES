@@ -1,3 +1,3 @@
-// Leave unset until a scoped, independently secured consent-based API is deployed.
-// Never commit API passwords or private data.
-export const RESEARCH_API_URL = '';
+// Same-origin Vercel Function. Database credentials and private records never reach the browser.
+export const RESEARCH_API_URL = '/api/research';
+export const CONSENT_VERSION = '2026-10-25';

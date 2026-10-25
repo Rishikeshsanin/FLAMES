@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Great+Vibes&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="./styles.css"/>
+  <link rel="stylesheet" href="./privacy.css"/>
   <script type="module" src="./app.mjs"></script>
 </head>
 <body>
@@ -17,7 +18,7 @@
  <header class="site-header">
   <a href="#top" class="brand" aria-label="FLAMES home"><span class="brand-icon">♡</span><span>flames<span class="brand-dot">.</span></span></a>
   <span class="header-annotation">the cutest little chaos on the internet <span aria-hidden="true">✦</span></span>
-  <button class="sound-button" id="soundToggle" type="button" aria-label="Turn sound on" aria-pressed="false">♫ <span>sound off</span></button>
+  <button class="sound-button" id="soundToggle" type="button" onclick="void 0" aria-label="Turn sound on" aria-pressed="false">♫ <span>sound off</span></button>
  </header>
  <main id="top">
   <section class="hero" id="hero">
@@ -26,7 +27,7 @@
     <p class="pre-title">for the hopeless romantics and the curious</p>
     <h1>What's your<br/><em>love story?</em><span class="heading-heart">♥</span></h1>
     <p class="hero-description">Two names. A little magic. One ridiculously cute way to find out what the stars have to say.</p>
-    <button class="primary-button start-button" type="button" id="heroStart">let's find out <span aria-hidden="true">↗</span></button>
+    <button class="primary-button start-button" type="button" onclick="void 0" id="heroStart">let's find out <span aria-hidden="true">↗</span></button>
     <p class="microcopy">no account · no history · just butterflies 🦋</p>
    </div>
    <div class="hero-art" aria-hidden="true">
@@ -56,6 +57,12 @@
       </div>
       <p class="input-error" id="inputError" role="alert" hidden></p>
       <div class="options-row"><label for="speed">the vibe:</label><select id="speed"><option value="dreamy">slow & dreamy</option><option value="normal">just right</option><option value="quick">quick magic</option></select></div>
+      <fieldset class="consent-box entry-consent"><legend>your story, your choice</legend>
+       <p>With your permission, this game may store the result and feedback for product testing. Names are stored only if you separately choose that option, kept for up to 30 days, and never shown publicly.</p>
+       <label><input type="checkbox" id="analyticsConsent"/> Share this result and my feedback for testing</label>
+       <label class="name-consent"><input type="checkbox" id="namesConsent" disabled/> Also store the names I enter (optional)</label>
+       <small>You can play without sharing anything. No account, fingerprinting, or names in URLs. <a href="#privacy">Privacy & deletion</a></small>
+      </fieldset>
       <button type="submit" class="primary-button magic-button">let the magic begin <span aria-hidden="true">✦</span></button>
      </form>
     </section>
@@ -70,7 +77,7 @@
        <div class="effects-layer" id="effectsLayer" aria-hidden="true"></div>
       </div>
       <div class="count-holder"><span id="strikeCount">0 / 0</span><div class="count-track"><span id="countFill"></span></div><p id="strikeMessage" class="sequence-message" aria-live="polite">The stars are looking for a match...</p></div>
-      <button class="text-button" id="skipSequence" type="button">skip the magic →</button>
+      <button class="text-button" id="skipSequence" type="button" onclick="void 0">skip the magic →</button>
     </section>
     <section class="scene" id="eliminationScene" aria-label="FLAMES counting" hidden>
       <p class="scene-kicker">now, the final little ritual...</p>
@@ -78,7 +85,7 @@
       <p class="scene-subtitle" id="eliminationDesc">Watch the universe narrow it down.</p>
       <div class="flames-circle" id="flamesCircle" aria-label="Remaining FLAMES letters"></div>
       <p class="sequence-message" id="eliminationMessage" aria-live="polite">F · L · A · M · E · S</p>
-      <button class="text-button" id="skipElimination" type="button">reveal my result →</button>
+      <button class="text-button" id="skipElimination" type="button" onclick="void 0">reveal my result →</button>
     </section>
     <section class="scene" id="resultScene" aria-label="Your FLAMES result" hidden>
      <div class="result-starry"><span class="result-star s-one">✦</span><span class="result-star s-two">✧</span><span class="result-star s-three">✧</span>
@@ -88,19 +95,18 @@
       <p class="result-names" id="resultNames"></p>
       <p class="result-description" id="resultDescription"></p>
      </div>
-     <div class="result-actions"><button class="secondary-button" id="shareResult" type="button">↓ save a little memory</button><button class="text-button" id="watchAgain" type="button">↻ watch again</button></div>
+     <div class="result-actions"><button class="secondary-button" id="shareResult" type="button" onclick="void 0">↓ save a little memory</button><button class="text-button" id="watchAgain" type="button" onclick="void 0">↻ watch again</button></div>
      <div class="feedback-panel" id="feedbackPanel">
        <p class="feedback-heading">be honest, cutie... <span>♡</span></p><h4>Are you happy with your result?</h4>
-       <div class="feedback-buttons"><button id="likedYes" type="button" class="feedback-button">yes, i'm blushing! 💗</button><button id="likedNo" type="button" class="feedback-button alt">umm, not really 🥺</button></div>
+       <div class="feedback-buttons"><button id="likedYes" type="button" onclick="void 0" class="feedback-button">yes, i'm blushing! 💗</button><button id="likedNo" type="button" onclick="void 0" class="feedback-button alt">umm, not really 🥺</button></div>
        <p class="feedback-note" id="feedbackNote" aria-live="polite"></p>
-       <div class="consent-box"><label><input type="checkbox" id="analyticsConsent"/> Share anonymous game feedback to help us improve</label><label class="name-consent"><input type="checkbox" id="namesConsent" disabled/> Also include the names I entered (optional)</label><small>Optional. The game works without this. Feedback is only sent if the research service is configured; see privacy notes.</small></div>
      </div>
-     <button class="text-button restart-link" id="playAgain" type="button">try two other names ↗</button>
+     <button class="text-button restart-link" id="playAgain" type="button" onclick="void 0">try two other names ↗</button>
     </section>
     <section class="scene" id="whatIfScene" aria-label="Try different names" hidden>
       <div class="cupid-tag">💘 cupid's second chance</div><h3 class="scene-title">Maybe the stars need <em>another look?</em></h3>
       <p class="scene-subtitle">We won't change the rules. But full names and real nicknames can tell another story!</p>
-      <form id="variationForm" class="variation-form">
+      <form id="variationForm" class="variation-form" novalidate>
         <label>First person's full name<input id="fullFirst" maxlength="120" placeholder="First Middle Last" autocomplete="off"/></label>
         <label>Second person's full name<input id="fullSecond" maxlength="120" placeholder="First Middle Last" autocomplete="off"/></label>
         <label>Nicknames for person one <small>(comma separated)</small><input id="nickFirst" maxlength="180" placeholder="e.g. Alex, Lex"/></label>
@@ -109,12 +115,16 @@
         <button class="primary-button" type="submit">find a different story ✨</button>
       </form>
       <div class="variation-results" id="variationResults" aria-live="polite"></div>
-      <button class="text-button" id="backToResult" type="button">← back to my result</button>
+      <button class="text-button" id="backToResult" type="button" onclick="void 0">← back to my result</button>
     </section>
    </div>
    <p class="disclaimer">FLAMES is a nostalgic just-for-fun game — not a real prediction of a relationship. ☁</p>
   </section>
   <section class="ending-strip" aria-label="Little reminder"><span>✦</span> whatever the letters say, your story is yours to write <span>♡</span></section>
+  <section class="privacy-section" id="privacy" aria-labelledby="privacyTitle">
+   <div><span class="section-caption">privacy, in plain words</span><h2 id="privacyTitle">Your names stay <em>your choice.</em></h2></div>
+   <div class="privacy-copy"><p>The game works without data sharing. If you opt in, we store the calculated result, feedback, and a random session ID so consecutive attempts can be understood together. Names are included only with the separate names option and expire after 30 days; other testing records expire after 90 days.</p><p>We do not create accounts, fingerprint devices, or publish entered names. You can erase the records linked to this browser session at any time.</p><button class="secondary-button" id="deleteSharedData" type="button" onclick="void 0">delete my shared session</button><span id="privacyStatus" role="status" aria-live="polite"></span></div>
+  </section>
  </main>
  <footer><span class="brand">♡ flames.</span><span>made with a little too much love · no public history</span><a href="#top">back to the clouds ↑</a></footer>
  <div id="toast" role="status" aria-live="polite" class="toast" hidden></div>
