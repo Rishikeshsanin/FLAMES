@@ -5,9 +5,15 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check engine.mjs && node --check app.mjs && node --check research-config.mjs"
+    "check": "node --check engine.mjs && node --check app.mjs && node --check research-config.mjs && node --check api/_supabase.mjs && node --check api/research.mjs"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  },
+  "dependencies": {
+    "postgres": "3.4.7"
   }
 }

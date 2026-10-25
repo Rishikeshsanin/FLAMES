@@ -1,5 +1,5 @@
 import {calculateFlames, exploreAlternatives, OUTCOMES, tokenizeName} from './engine.mjs';
-import {RESEARCH_API_URL} from './research-config.mjs';
+import {RESEARCH_API_URL, CONSENT_VERSION} from './research-config.mjs';
 
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(resolve=>setTimeout(resolve,matchMedia('(prefers-reduced-motion: reduce)').matches?15:ms));
@@ -12,7 +12,7 @@ const schemes = {
  S:['Siblings','✌','forever-together, partners-in-chaos energy!','PARTNERS IN CHAOS'],
  zero:['Perfect Tie','∞','every letter found its pair, so there are none left to count.','ALL LETTERS MATCHED']
 };
-const state = {a:'',b:'',data:null,run:0,sound:false,audio:null,feedback:null,attempt:null,parent:null,alternative:false,desired:null,session:null};
+const state = {a:'',b:'',data:null,run:0,sound:false,audio:null,feedback:null,attempt:null,parent:null,alternative:false,desired:null,session:null,deletionToken:null,recorded:false,previousResult:null,variations:[]};
 const timing = {dreamy:[1200,550,950],normal:[700,330,530],quick:[340,170,320]};
 const durations = () => timing[$('speed').value]||timing.dreamy;
 function scene(which) {
@@ -141,15 +141,16 @@ function showResult(id){
  document.querySelectorAll('.feedback-button').forEach(b=>b.disabled=false);
  tone(840);
 }
-function newRound(a,b,alt=false,parent=null){
+function newRound(a,b,alt=false,parent=null,previousResult=null,variations=[]){
  ++state.run;state.a=a.trim();state.b=b.trim();
  state.data=calculateFlames(state.a,state.b);
  if(state.data.status==='invalid-input'){msg('both names must contain letters ♡');return;}
- state.alternative=alt;state.parent=parent;state.attempt=crypto.randomUUID();
+ state.alternative=alt;state.parent=parent;state.attempt=crypto.randomUUID();state.recorded=false;state.recordPromise=null;
+ state.previousResult=previousResult;state.variations=variations;
  state.feedback=null;state.desired=null;
  $('firstName').value=state.a;$('secondName').value=state.b;
  $('experience').scrollIntoView({behavior:'smooth',block:'start'});
- void striking(state.run);
+ void striking(state.run);state.recordPromise=recordAttempt();
 }
 $('heroStart').onclick=()=>{$('experience').scrollIntoView({behavior:'smooth'});$('firstName').focus({preventScroll:true});};
 $('soundToggle').onclick=()=>{
@@ -168,10 +169,6 @@ $('nameForm').onsubmit=e=>{
 };
 $('skipSequence').onclick=()=>{++state.run;void eliminating(state.run);};
 $('skipElimination').onclick=()=>{++state.run;showResult(state.run);};
-$('analyticsConsent').onchange=()=>{
- $('namesConsent').disabled=!$('analyticsConsent').checked;
- if(!$('analyticsConsent').checked)$('namesConsent').checked=false;
-};
 function getSession(){
  if(state.session)return state.session;
  try{
@@ -181,32 +178,52 @@ function getSession(){
  }catch{state.session=crypto.randomUUID()}
  return state.session;
 }
-async function record(liked,wantsChange){
- if(!$('analyticsConsent').checked)return;
- if(!RESEARCH_API_URL){msg('research service not configured; no data was submitted');return;}
- const withNames=$('namesConsent').checked;
- const event={
-  session_id:getSession(),attempt_id:state.attempt,parent_attempt_id:state.parent,
-  occurred_at:new Date().toISOString(),algorithm_version:'1.0.0',
-  result_letter:state.data.letter,remaining_count:state.data.remainingCount,
-  liked_result:liked,wants_change:wantsChange,desired_letter:state.desired,
-  is_alternative:state.alternative,analytics_consent:true,names_consent:withNames,
-  name_one:withNames?state.a:null,name_two:withNames?state.b:null
- };
+function getDeletionToken(){
+ if(state.deletionToken)return state.deletionToken;
+ try{
+  const stored=sessionStorage.getItem('flames-delete-token-v1');
+  if(stored)state.deletionToken=stored;
+  else {state.deletionToken=crypto.randomUUID()+crypto.randomUUID();sessionStorage.setItem('flames-delete-token-v1',state.deletionToken)}
+ }catch{state.deletionToken=crypto.randomUUID()+crypto.randomUUID()}
+ return state.deletionToken;
+}
+async function sendResearch(method,event){
  try {
-  const r=await fetch(RESEARCH_API_URL,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(event)});
-  if(!r.ok)msg('research submission unavailable — your game still works');
- }catch{msg('research submission unavailable — your game still works')}
+  const r=await fetch(RESEARCH_API_URL,{method,headers:{'content-type':'application/json'},body:JSON.stringify(event),keepalive:true});
+  if(!r.ok)throw new Error('unavailable');
+  return true;
+ }catch{msg('sharing is temporarily unavailable — your game still works');return false}
+}
+async function recordAttempt(){
+ // Only a new calculation creates an attempt. Replaying does not.
+ const attempt=state.attempt,session=getSession();
+ const ok=await sendResearch('POST',{
+  session_id:session,attempt_id:attempt,parent_attempt_id:state.parent,
+  occurred_at:new Date().toISOString(),consent_version:CONSENT_VERSION,algorithm_version:'1.1.0',
+  is_alternative:state.alternative,previous_result_letter:state.previousResult,
+  analytics_consent:true,names_consent:true,deletion_token:getDeletionToken(),
+  name_one:state.a,name_two:state.b,variations:state.variations
+ });
+ if(state.attempt===attempt)state.recorded=ok;
+ return ok;
+}
+async function recordFeedback(liked,wantsChange){
+ // The feedback POST must follow a confirmed attempt write, not race it.
+ const attempt=state.attempt,session=getSession(),desired=state.desired;
+ const stored=await state.recordPromise;
+ if(!stored)return;
+ await sendResearch('PATCH',{session_id:session,attempt_id:attempt,
+  liked_result:liked,wants_change:wantsChange,desired_letter:desired});
 }
 $('likedYes').onclick=()=>{
  state.feedback=true;$('feedbackNote').textContent='awww, the universe is blushing! 💗';
  document.querySelectorAll('.feedback-button').forEach(b=>b.disabled=true);
- void record(true,false);
+ void recordFeedback(true,false);
 };
 $('likedNo').onclick=()=>{
- state.feedback=false;void record(false,true);scene('whatIfScene');
+ state.feedback=false;void recordFeedback(false,true);scene('whatIfScene');
 };
-$('watchAgain').onclick=()=>newRound(state.a,state.b,state.alternative,state.parent);
+$('watchAgain').onclick=()=>{++state.run;void striking(state.run)};
 $('playAgain').onclick=()=>{++state.run;state.parent=null;scene('entryScene');$('firstName').value='';$('secondName').value='';$('firstName').focus();};
 $('backToResult').onclick=()=>scene('resultScene');
 $('variationForm').onsubmit=e=>{
@@ -215,6 +232,7 @@ $('variationForm').onsubmit=e=>{
  const one={original:state.a,fullName:$('fullFirst').value,nicknames:nick('nickFirst')};
  const two={original:state.b,fullName:$('fullSecond').value,nicknames:nick('nickSecond')};
  const desired=$('desiredResult').value||null;state.desired=desired;
+ void recordFeedback(false,true);
  const data=exploreAlternatives(one,two,desired);
  const current=tokenizeName(state.a).map(x=>x.letter).join('')+'|'+tokenizeName(state.b).map(x=>x.letter).join('');
  const matches=data.matching.filter(row=>row.status==='ok'&&(
@@ -231,7 +249,10 @@ $('variationForm').onsubmit=e=>{
   detail.append(title,origin);
   const letter=document.createElement('b');letter.textContent=schemes[item.letter][0];
   const action=document.createElement('button');action.type='button';action.textContent='watch ✨';
-  action.onclick=()=>newRound(item.left.name,item.right.name,true,state.attempt);
+   action.onclick=()=>newRound(item.left.name,item.right.name,true,state.attempt,state.data.letter,[
+    ...(item.left.source==='original'?[]:[{person_side:1,variation_type:item.left.source,name_value:item.left.name}]),
+    ...(item.right.source==='original'?[]:[{person_side:2,variation_type:item.right.source,name_value:item.right.name}])
+   ]);
   row.append(detail,letter,action);root.append(row);
  });
 };
