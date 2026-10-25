@@ -1,5 +1,5 @@
 .entry-consent{max-width:680px;border:1px solid #efd0dc;border-radius:16px;background:#fffafb;padding:14px 18px}
-.entry-consent legend{padding:0 8px;font:600 15px "Playfair Display",serif;color:#934363}
+.entry-consent strong{display:block;margin-bottom:7px;font:600 17px "Playfair Display",serif;color:#934363}
 .entry-consent p{margin:0;text-align:center}
 .entry-consent a{color:#a82d66}
 .privacy-section{max-width:1050px;margin:80px auto;padding:0 24px 90px;display:grid;grid-template-columns:.75fr 1.25fr;gap:55px;align-items:start}
