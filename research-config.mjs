@@ -1,2 +1,3 @@
-// Public ingestion endpoint. Contains no secret. Names only submitted after explicit optional consent.
-export const RESEARCH_API_URL='https://nowlwprtcnieihelqjoa.supabase.co/functions/v1/flames-research-api';
+// Leave unset until a scoped, independently secured consent-based API is deployed.
+// Never commit API passwords or private data.
+export const RESEARCH_API_URL = '';
