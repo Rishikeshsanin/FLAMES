@@ -25,8 +25,7 @@ for(const width of [320,390,430,768,1366]){
   await page.locator('#firstName').fill('Rishi');
   await page.locator('#secondName').fill('Maria');
   await page.locator('#speed').selectOption('quick');
-  await page.locator('#analyticsConsent').check();
-  await page.locator('#namesConsent').check();
+  if(!(await page.locator('.entry-consent').textContent()).includes('saved for testing'))throw new Error('missing storage notice');
   await page.locator('#nameForm button[type="submit"]').click();
   await page.locator('#strikeScene').waitFor({state:'visible'});
   const actual=calculateFlames('Rishi','Maria');
@@ -41,6 +40,9 @@ for(const width of [320,390,430,768,1366]){
   const result=await page.locator('#resultTitle').textContent();
   if(result!==actual.result)throw new Error('result mismatch: '+result+' expected '+actual.result);
   if(research.filter(x=>x.method==='POST').length!==1)throw new Error('initial attempt was not recorded exactly once');
+  const storedAttempt=research.find(x=>x.method==='POST').body;
+  if(storedAttempt.name_one!=='Rishi'||storedAttempt.name_two!=='Maria'||storedAttempt.names_consent!==true)
+    throw new Error('both names were not submitted with the calculation');
   await page.locator('#watchAgain').click();
   await page.locator('#strikeScene').waitFor({state:'visible'});
   if(research.filter(x=>x.method==='POST').length!==1)throw new Error('replay created a duplicate attempt');
@@ -59,7 +61,7 @@ for(const width of [320,390,430,768,1366]){
   await page.locator('#entryScene').waitFor({state:'visible'});
   const dims=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:window.innerWidth}));
   if(dims.scroll>dims.viewport+5)throw new Error('horizontal overflow '+JSON.stringify(dims));
-  console.log('PASS '+width+'px: consent → names → strikes → FLAMES → replay dedupe → feedback → alternatives → restart');
+  console.log('PASS '+width+'px: notice → names → strikes → FLAMES → replay dedupe → feedback → alternatives → restart');
   if(width===390)await page.screenshot({path:'flames-mobile.png',fullPage:true});
  }catch(error){
   fails++;console.error('FAIL '+width+'px: '+error.stack);
