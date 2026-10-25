@@ -23,3 +23,7 @@ test('feedback updates the existing attempt id',async()=>{
  let rpcBody;globalThis.fetch=async(_url,options)=>{rpcBody=JSON.parse(options.body);return new Response('{}',{status:200})};
  const res=response();await handler({method:'PATCH',headers:{},body:{...ids,liked_result:false,wants_change:true,desired_letter:'L'}},res);assert.equal(res.statusCode,200);assert.equal(rpcBody.p_attempt_id,ids.attempt_id);assert.equal(rpcBody.p_session_id,ids.session_id);
 });
+
+test('unsupported methods return 405 without parsing identifiers',async()=>{
+ const res=response();await handler({method:'GET',headers:{},body:null},res);assert.equal(res.statusCode,405);assert.match(res.headers.allow,/POST/);
+});
