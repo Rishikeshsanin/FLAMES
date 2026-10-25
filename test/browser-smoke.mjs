@@ -47,6 +47,9 @@ for(const width of [320,390,430,768,1366]){
   await page.locator('#strikeScene').waitFor({state:'visible'});
   if(research.filter(x=>x.method==='POST').length!==1)throw new Error('replay created a duplicate attempt');
   await page.locator('#skipSequence').evaluate(el=>{if(!el.closest('section').hidden)el.click()});await page.waitForFunction(()=>!document.querySelector('#eliminationScene').hidden||!document.querySelector('#resultScene').hidden);await page.locator('#skipElimination').evaluate(el=>{if(!el.closest('section').hidden)el.click()});
+  const retryHint=page.locator('#tryNamesHint');
+  if(!(await retryHint.isVisible())||!(await retryHint.textContent()).includes('full names or nicknames'))
+    throw new Error('Missing helpful alternative-name prompt below the No button');
   await page.locator('#likedNo').click();
   await page.locator('#whatIfScene').waitFor({state:'visible'});
   await page.locator('#fullFirst').fill('Rishi Kumar');
