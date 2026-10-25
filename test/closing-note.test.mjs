@@ -13,7 +13,7 @@ test('closing message celebrates living and kindness without promising a FLAMES 
  assert.doesNotMatch(markup,/privacy, in plain words/i);
 });
 test('storage notice stays discoverable and accessible',()=>{
- assert.match(markup,/class="entry-consent"/);
+ assert.match(markup,/class="[^"]*entry-consent/);
  assert.match(markup,/href="#privacy"/);
  assert.match(markup,/<details class="privacy-note" id="privacy">/);
  assert.match(markup,/<summary>♡ how your names are stored/);
