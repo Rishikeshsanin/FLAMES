@@ -1,0 +1,13 @@
+{
+  "name": "flames-love-story",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check engine.mjs && node --check app.mjs && node --check research-config.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
