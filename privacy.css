@@ -2,6 +2,7 @@
 .entry-consent strong{display:block;margin-bottom:7px;font:600 17px "Playfair Display",serif;color:#934363}
 .entry-consent p{margin:0;text-align:center}
 .entry-consent a{color:#a82d66}
+.entry-consent .entry-storage-disclosure{display:block;margin:8px auto 0;max-width:630px;font-size:11px;line-height:1.65;color:#995d7b}
 
 /* A closing love letter: intimate, joyful, and just as much a part of the game. */
 .love-letter-section{position:relative;isolation:isolate;overflow:hidden;max-width:1080px;margin:76px auto 22px;padding:76px 38px 64px;border:1px solid #f1cad9;border-radius:44px;text-align:center;background:radial-gradient(circle at 10% 12%,#ffe1edb8 0,transparent 35%),radial-gradient(circle at 89% 78%,#f7d2e5bd 0,transparent 39%),linear-gradient(145deg,#fffafc,#fff1f6 62%,#fff8fa);box-shadow:0 24px 65px #ad527119}
