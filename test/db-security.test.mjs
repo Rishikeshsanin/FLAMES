@@ -7,11 +7,12 @@ test('public research API refuses missing, admin and direct database URLs before
  const before=process.env.FLAMES_PUBLIC_DATABASE_URL;
  try{
   delete process.env.FLAMES_PUBLIC_DATABASE_URL;
-  await assert.rejects(rpc('delete_session_data',{}),/not configured/);
+  await assert.rejects(rpc('record_feedback',{}),/not configured/);
   process.env.FLAMES_PUBLIC_DATABASE_URL='postgres://postgres:placeholder@db.nowlwprtcnieihelqjoa.supabase.co:5432/postgres?sslmode=require';
-  await assert.rejects(rpc('delete_session_data',{}),/identity\/configuration is invalid/);
+  await assert.rejects(rpc('record_feedback',{}),/identity\/configuration is invalid/);
   process.env.FLAMES_PUBLIC_DATABASE_URL='postgres://flames_lab_admin.nowlwprtcnieihelqjoa:placeholder@fake-test.pooler.supabase.com:6543/postgres?sslmode=require';
-  await assert.rejects(rpc('delete_session_data',{}),/identity\/configuration is invalid/);
+  await assert.rejects(rpc('record_feedback',{}),/identity\/configuration is invalid/);
+  await assert.rejects(rpc('delete_session_data',{}),/Unapproved FLAMES RPC/);
   await assert.rejects(rpc('admin_dashboard',{}),/Unapproved FLAMES RPC/);
  }finally{
   if(before===undefined)delete process.env.FLAMES_PUBLIC_DATABASE_URL;
