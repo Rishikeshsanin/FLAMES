@@ -10,16 +10,16 @@ const cleanName = value => typeof value === 'string' ? value.normalize('NFC').tr
 export default async function handler(req, res) {
   if (!allowedOrigin(req)) return send(res, 403, {error:'Origin is not allowed'});
   if (req.method === 'OPTIONS') {
-    res.setHeader('allow','POST, PATCH, DELETE, OPTIONS');
+    res.setHeader('allow','POST, PATCH, OPTIONS');
     return send(res,204,{});
   }
-  if (!['POST','PATCH','DELETE'].includes(req.method)) {
-    res.setHeader('allow','POST, PATCH, DELETE, OPTIONS');
+  if (!['POST','PATCH'].includes(req.method)) {
+    res.setHeader('allow','POST, PATCH, OPTIONS');
     return send(res,405,{error:'Method not allowed'});
   }
   const body = parseBody(req);
   if (!body) return send(res,400,{error:'Invalid JSON'});
-  if (!UUID.test(body.session_id || '') || !UUID.test(body.attempt_id || '') && req.method !== 'DELETE')
+  if (!UUID.test(body.session_id || '') || !UUID.test(body.attempt_id || ''))
     return send(res,400,{error:'Invalid identifier'});
   try {
     if (req.method === 'POST') {
@@ -58,13 +58,7 @@ export default async function handler(req, res) {
       });
       return send(res,200,{ok:true,data});
     }
-    if (req.method === 'DELETE') {
-      const token=String(body.deletion_token||'');
-      if (!UUID.test(body.session_id||'') || token.length<32) return send(res,400,{error:'Invalid deletion request'});
-      const data=await rpc('delete_session_data',{p_session_id:body.session_id,p_deletion_token_hash:hash(token)});
-      return send(res,200,{ok:true,data});
-    }
-  } catch (error) {
+    } catch (error) {
     console.error('FLAMES research request failed', {method:req.method,message:error.message});
     return send(res,error.message.includes('rate')?429:503,{error:'Research service is temporarily unavailable'});
   }
