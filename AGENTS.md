@@ -1,0 +1,3 @@
+# FLAMES Agent Safety Rules
+
+This repo owns only the FLAMES game and its isolated database schema `flames` in Supabase Project Hub (`nowlwprtcnieihelqjoa`). Read `SUPABASE_HUB_RULES.md` before any database work. Never alter another schema, shared authentication configuration, other repository, project secrets, or other Vercel project. Real user names are sensitive and must not be committed, logged, used in URLs, or collected without separate explicit consent. Visitors must be able to play without sending data. Never expose administrative data in the public UI. All game changes require deterministic algorithm tests and mobile checks.
