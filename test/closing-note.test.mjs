@@ -12,12 +12,14 @@ test('closing message celebrates living and kindness without promising a FLAMES 
  assert.match(markup,/id="loveLetterTitle"/);
  assert.doesNotMatch(markup,/privacy, in plain words/i);
 });
-test('storage notice stays discoverable and accessible',()=>{
+test('entry notice remains clear without duplicate footer privacy panel',()=>{
  assert.match(markup,/class="[^"]*entry-consent/);
- assert.match(markup,/href="#privacy"/);
- assert.match(markup,/<details class="privacy-note" id="privacy">/);
- assert.match(markup,/<summary>♡ how your names are stored/);
- assert.match(markup,/Names expire after 30 days/);
+ assert.match(markup,/both entered names/);
+ assert.match(markup,/saved for testing/);
+ assert.match(markup,/Names are kept up to 30 days/);
+ assert.doesNotMatch(markup,/class="privacy-note"/);
+ assert.doesNotMatch(markup,/href="#privacy"/);
+ assert.doesNotMatch(styles,/\\.privacy-note/);
 });
 test('closing note is responsive and respects reduced motion',()=>{
  assert.match(styles,/@media\(max-width:540px\)/);
