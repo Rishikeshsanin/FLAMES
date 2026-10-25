@@ -61,3 +61,12 @@ test('only same-origin FLAMES project preview may submit from a preview hostname
  assert.equal(spoofed.statusCode,403);
  assert.equal(calls,1);
 });
+
+test('public deletion is unavailable; records can only be managed privately',async()=>{
+ let called=false;setRpcTestDouble(async()=>{called=true;return {}});
+ const result=response();
+ await handler({method:'DELETE',headers:{origin:'https://flames-love-story.vercel.app'},body:{...ids,deletion_token:'x'.repeat(64)}},result);
+ assert.equal(result.statusCode,405);
+ assert.equal(called,false);
+ assert.equal(result.headers.allow,'POST, PATCH, OPTIONS');
+});
