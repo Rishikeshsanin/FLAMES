@@ -1,23 +1,5 @@
-const BASE_URL = process.env.SUPABASE_URL;
-const API_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
-
-export async function rpc(name, body) {
-  if (!BASE_URL || !API_KEY) throw new Error('Research service is not configured');
-  const response = await fetch(`${BASE_URL}/rest/v1/rpc/${name}`, {
-    method: 'POST',
-    headers: {
-      apikey: API_KEY,
-      authorization: `Bearer ${API_KEY}`,
-      'content-type': 'application/json',
-      'content-profile': 'flames',
-      'accept-profile': 'flames'
-    },
-    body: JSON.stringify(body)
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Database request failed (${response.status})`);
-  return text ? JSON.parse(text) : null;
-}
+import {rpc} from './_postgres.mjs';
+export {rpc};
 
 export function send(res, status, body) {
   res.statusCode = status;
