@@ -21,22 +21,42 @@ const signatures=Object.freeze({
   delete_session_data:[['p_session_id','uuid'],['p_deletion_token_hash','text']]
 });
 
-function scopedUrl(){
-  const value=process.env.FLAMES_PUBLIC_DATABASE_URL;
+/**
+ * Validate the isolated FLAMES connection without giving the database driver
+ * a raw URL. A literal percent sign in a password is otherwise decoded by
+ * Postgres.js's URL parser and can throw "URI malformed" before connecting.
+ * The project role, host pattern and target database remain strictly scoped.
+ */
+export function scopedConnectionOptions(value=process.env.FLAMES_PUBLIC_DATABASE_URL){
   if(!value)throw Error('FLAMES public database connection is not configured');
   let u;
   try{u=new URL(value)}catch{throw Error('Invalid FLAMES database configuration')}
   if(!['postgres:','postgresql:'].includes(u.protocol)
     || !/^[a-z0-9-]+\.pooler\.supabase\.com$/.test(u.hostname)
     || u.port!=='6543' || u.pathname!=='/postgres'
-    || decodeURIComponent(u.username)!==(ROLE+'.'+PROJECT_REF)
+    || u.username!==(ROLE+'.'+PROJECT_REF)
     || !u.password || u.searchParams.get('sslmode')!=='require'
-    || u.searchParams.has('options'))
+    || [...u.searchParams.keys()].some(x=>x!=='sslmode')
+    || u.hash || u.searchParams.has('options'))
     throw Error('FLAMES public pooler identity/configuration is invalid');
-  return value;
+  let password;
+  try{password=decodeURIComponent(u.password)}
+  catch{
+    // A literal '%' is valid in PostgreSQL passwords but must not be treated
+    // as a malformed URI escape by the database driver.
+    password=u.password.replace(/%([0-9a-fA-F]{2})/g,(_,hex)=>String.fromCharCode(parseInt(hex,16)));
+  }
+  return {
+    host:u.hostname,
+    port:Number(u.port),
+    database:'postgres',
+    username:ROLE+'.'+PROJECT_REF,
+    password
+  };
 }
 function client(){
-  if(!sql)sql=postgres(scopedUrl(),{
+  if(!sql)sql=postgres({
+    ...scopedConnectionOptions(),
     ssl:'require',prepare:false,max:2,connect_timeout:5,idle_timeout:10
   });
   return sql;
