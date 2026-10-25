@@ -145,12 +145,12 @@ function newRound(a,b,alt=false,parent=null,previousResult=null,variations=[]){
  ++state.run;state.a=a.trim();state.b=b.trim();
  state.data=calculateFlames(state.a,state.b);
  if(state.data.status==='invalid-input'){msg('both names must contain letters ♡');return;}
- state.alternative=alt;state.parent=parent;state.attempt=crypto.randomUUID();state.recorded=false;
+ state.alternative=alt;state.parent=parent;state.attempt=crypto.randomUUID();state.recorded=false;state.recordPromise=null;
  state.previousResult=previousResult;state.variations=variations;
  state.feedback=null;state.desired=null;
  $('firstName').value=state.a;$('secondName').value=state.b;
  $('experience').scrollIntoView({behavior:'smooth',block:'start'});
- void striking(state.run);void recordAttempt();
+ void striking(state.run);state.recordPromise=recordAttempt();
 }
 $('heroStart').onclick=()=>{$('experience').scrollIntoView({behavior:'smooth'});$('firstName').focus({preventScroll:true});};
 $('soundToggle').onclick=()=>{
@@ -195,21 +195,25 @@ async function sendResearch(method,event){
  }catch{msg('sharing is temporarily unavailable — your game still works');return false}
 }
 async function recordAttempt(){
- if(state.recorded)return;
- state.recorded=true;
+ // Only a new calculation creates an attempt. Replaying does not.
+ const attempt=state.attempt,session=getSession();
  const ok=await sendResearch('POST',{
-  session_id:getSession(),attempt_id:state.attempt,parent_attempt_id:state.parent,
+  session_id:session,attempt_id:attempt,parent_attempt_id:state.parent,
   occurred_at:new Date().toISOString(),consent_version:CONSENT_VERSION,algorithm_version:'1.1.0',
   is_alternative:state.alternative,previous_result_letter:state.previousResult,
   analytics_consent:true,names_consent:true,deletion_token:getDeletionToken(),
   name_one:state.a,name_two:state.b,variations:state.variations
  });
- if(!ok)state.recorded=false;
+ if(state.attempt===attempt)state.recorded=ok;
+ return ok;
 }
 async function recordFeedback(liked,wantsChange){
- if(!state.recorded)return;
- await sendResearch('PATCH',{session_id:getSession(),attempt_id:state.attempt,
-  liked_result:liked,wants_change:wantsChange,desired_letter:state.desired});
+ // The feedback POST must follow a confirmed attempt write, not race it.
+ const attempt=state.attempt,session=getSession(),desired=state.desired;
+ const stored=await state.recordPromise;
+ if(!stored)return;
+ await sendResearch('PATCH',{session_id:session,attempt_id:attempt,
+  liked_result:liked,wants_change:wantsChange,desired_letter:desired});
 }
 $('likedYes').onclick=()=>{
  state.feedback=true;$('feedbackNote').textContent='awww, the universe is blushing! 💗';
