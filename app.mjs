@@ -256,16 +256,6 @@ $('variationForm').onsubmit=e=>{
   row.append(detail,letter,action);root.append(row);
  });
 };
-$('deleteSharedData').onclick=async()=>{
- const status=$('privacyStatus');
- if(!state.session){status.textContent='No shared session exists in this browser.';return}
- status.textContent='Deleting…';
- const ok=await sendResearch('DELETE',{session_id:getSession(),deletion_token:getDeletionToken()});
- if(ok){
-  status.textContent='Your shared session was deleted.';state.session=null;state.deletionToken=null;
-  try{sessionStorage.removeItem('flames-session-v1');sessionStorage.removeItem('flames-delete-token-v1')}catch{}
- }else status.textContent='Deletion is temporarily unavailable. Please try again.';
-};
 $('shareResult').onclick=async()=>{
  const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=1200;
  const c=canvas.getContext('2d');
