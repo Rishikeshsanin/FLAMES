@@ -36,3 +36,28 @@ test('missing database configuration fails closed without a fallback project key
   assert.equal(res.statusCode,503);
   assert.equal(res.body.error,'Research service is temporarily unavailable');
 });
+
+
+test('only same-origin FLAMES project preview may submit from a preview hostname',async()=>{
+ let calls=0;
+ setRpcTestDouble(async ()=>{calls++;return {stored:true}});
+ const host='flames-love-story-cgvu4z2gz-rishikeshsanin-1193s-projects.vercel.app';
+ const allowed=response();
+ await handler({method:'POST',headers:{origin:'https://'+host,host},body:{
+   ...ids,analytics_consent:true,names_consent:true,consent_version:'2026-10-25',
+   deletion_token:'y'.repeat(64),name_one:'Alex',name_two:'Maria'
+ }},allowed);
+ assert.equal(allowed.statusCode,201);
+ assert.equal(calls,1);
+ const mismatched=response();
+ await handler({method:'POST',headers:{origin:'https://'+host,host:'somewhere-else.vercel.app'},body:{}},mismatched);
+ assert.equal(mismatched.statusCode,403);
+ const unrelated=response();
+ const foreign='other-game-test-rishikeshsanin-1193s-projects.vercel.app';
+ await handler({method:'POST',headers:{origin:'https://'+foreign,host:foreign},body:{}},unrelated);
+ assert.equal(unrelated.statusCode,403);
+ const spoofed=response();
+ await handler({method:'POST',headers:{origin:'https://'+host+'.attacker.example',host:host+'.attacker.example'},body:{}},spoofed);
+ assert.equal(spoofed.statusCode,403);
+ assert.equal(calls,1);
+});
