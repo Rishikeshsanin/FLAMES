@@ -181,7 +181,7 @@ returns jsonb language plpgsql security definer set search_path=pg_catalog,flame
 declare v_from timestamptz; v_to timestamptz; v_source text; v_search text; v_page int; v_size int;
 begin
   perform flames.enforce_retention();
-  if p_admin_token_hash is distinct from (select config_value from flames.app_config where config_key='admin_token_hash') then
+  if p_admin_token_hash is null or p_admin_token_hash !~ '^[0-9a-f]{64} then
     raise exception 'unauthorized';
   end if;
   v_from:=coalesce((p_query->>'from')::timestamptz,now()-interval '30 days');
@@ -212,6 +212,214 @@ declare v_session uuid:=coalesce((p_record->>'session_id')::uuid,gen_random_uuid
 begin
  perform flames.enforce_retention();
  if p_admin_token_hash is distinct from (select config_value from flames.app_config where config_key='admin_token_hash') then raise exception 'unauthorized'; end if;
+ insert into flames.sessions(session_id,consent_version,analytics_consent,names_consent,deletion_token_hash,source,names_expires_at)
+ values(v_session,'admin-test',true,true,encode(extensions.gen_random_bytes(32),'hex'),coalesce(nullif(p_record->>'source',''),'manual_test'),now()+interval '30 days') on conflict do nothing;
+ insert into flames.attempts(attempt_id,session_id,parent_attempt_id,name_one,name_two,result_letter,remaining_count,is_alternative,previous_result_letter,algorithm_version,source)
+ values(v_attempt,v_session,nullif(p_record->>'parent_attempt_id','')::uuid,left(p_record->>'name_one',120),left(p_record->>'name_two',120),
+   nullif(p_record->>'result_letter',''),(p_record->>'remaining_count')::int,coalesce((p_record->>'is_alternative')::boolean,false),
+   nullif(p_record->>'previous_result_letter',''),coalesce(nullif(p_record->>'algorithm_version',''),'1.1.0'),coalesce(nullif(p_record->>'source',''),'manual_test'));
+ insert into flames.feedback(attempt_id,liked_result,wants_change,desired_letter)
+ values(v_attempt,(p_record->>'liked_result')::boolean,coalesce((p_record->>'wants_change')::boolean,false),nullif(p_record->>'desired_letter',''));
+ return jsonb_build_object('session_id',v_session,'attempt_id',v_attempt,'stored',true);
+end $$;
+
+revoke all on all tables in schema flames from public, anon, authenticated;
+revoke all on all sequences in schema flames from public, anon, authenticated;
+revoke all on all functions in schema flames from public, anon, authenticated;
+-- Created as NOLOGIN: the owner must separately verify the actual pooler host and
+-- provision distinct passwords in Vercel encrypted environment settings before LOGIN.
+DO $flames_roles$
+BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='flames_public_submitter') THEN
+    CREATE ROLE flames_public_submitter NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='flames_lab_admin') THEN
+    CREATE ROLE flames_lab_admin NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+END $flames_roles$;
+revoke all on schema flames from public,anon,authenticated;
+grant usage on schema flames to flames_public_submitter,flames_lab_admin;
+grant execute on function flames.ingest_attempt(uuid,uuid,uuid,timestamptz,text,boolean,text,text,text,text,integer,boolean,text,text,jsonb) to flames_public_submitter;
+grant execute on function flames.record_feedback(uuid,uuid,boolean,boolean,text) to flames_public_submitter;
+grant execute on function flames.delete_session_data(uuid,text) to flames_public_submitter;
+grant execute on function flames.admin_dashboard(text,jsonb) to flames_lab_admin;
+grant execute on function flames.admin_insert_test(text,jsonb) to flames_lab_admin;
+
+insert into hub.app_resources(app_id,resource_type,resource_name,resource_schema,is_shared,notes)
+select a.id,r.t,r.n,'flames',false,'FLAMES central research data'
+from hub.apps a cross join (values
+ ('schema','flames'),('table','sessions'),('table','attempts'),('table','feedback'),('table','name_variations'),('table','deletion_requests'),
+ ('rpc','ingest_attempt'),('rpc','record_feedback'),('rpc','delete_session_data'),('rpc','admin_dashboard'),('rpc','admin_insert_test'),('rpc','enforce_retention')) r(t,n)
+where a.slug='flames'
+on conflict do nothing;
+
+insert into hub.schema_versions(app_id,migration_key,notes)
+select id,'202610250001_flames_central_data','Central consent-based storage, private analytics RPCs and retention metadata'
+from hub.apps where slug='flames'
+on conflict do nothing;
+ or not exists (select 1 from flames.app_config where config_key='admin_token_hash' and config_value ~ '^[0-9a-f]{64} then
+    raise exception 'unauthorized';
+  end if;
+  v_from:=coalesce((p_query->>'from')::timestamptz,now()-interval '30 days');
+  v_to:=coalesce((p_query->>'to')::timestamptz,now()+interval '1 day');
+  v_source:=nullif(p_query->>'source',''); v_search:=nullif(lower(trim(p_query->>'search')),'');
+  v_page:=greatest(coalesce((p_query->>'page')::int,1),1); v_size:=least(greatest(coalesce((p_query->>'page_size')::int,50),1),200);
+  return jsonb_build_object(
+   'metrics',(select jsonb_build_object('attempts',count(*),'sessions',count(distinct a.session_id),
+     'liked',count(*) filter(where f.liked_result is true),'disliked',count(*) filter(where f.liked_result is false),
+     'alternatives',count(*) filter(where a.is_alternative),'changed_outcomes',count(*) filter(where a.is_alternative and a.previous_result_letter is distinct from a.result_letter),
+     'alternative_session_percent',round(100.0*count(distinct a.session_id) filter(where a.is_alternative)/nullif(count(distinct a.session_id),0),1),
+     'attempts_per_session',round(count(*)::numeric/nullif(count(distinct a.session_id),0),2))
+     from flames.attempts a left join flames.feedback f using(attempt_id) where a.created_at between v_from and v_to and (v_source is null or a.source=v_source)),
+   'distribution',(select coalesce(jsonb_object_agg(coalesce(result_letter,'tie'),n),'{}'::jsonb) from (select result_letter,count(*) n from flames.attempts where created_at between v_from and v_to and (v_source is null or source=v_source) group by result_letter)d),
+   'rows',(select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc),'[]'::jsonb) from (
+     select a.attempt_id,a.session_id,a.parent_attempt_id,a.created_at,a.name_one,a.name_two,a.result_letter,a.remaining_count,
+       a.is_alternative,a.previous_result_letter,a.algorithm_version,a.source,f.liked_result,f.wants_change,f.desired_letter
+     from flames.attempts a left join flames.feedback f using(attempt_id)
+     where a.created_at between v_from and v_to and (v_source is null or a.source=v_source)
+       and (v_search is null or lower(coalesce(a.name_one,'')||' '||coalesce(a.name_two,'')||' '||a.session_id::text) like '%'||v_search||'%')
+     order by a.created_at desc offset (v_page-1)*v_size limit v_size)x),
+   'page',v_page,'page_size',v_size);
+end $$;
+
+create or replace function flames.admin_insert_test(p_admin_token_hash text,p_record jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,flames as $$
+declare v_session uuid:=coalesce((p_record->>'session_id')::uuid,gen_random_uuid()); v_attempt uuid:=coalesce((p_record->>'attempt_id')::uuid,gen_random_uuid());
+begin
+ perform flames.enforce_retention();
+ if p_admin_token_hash is distinct from (select config_value from flames.app_config where config_key='admin_token_hash') then raise exception 'unauthorized'; end if;
+ insert into flames.sessions(session_id,consent_version,analytics_consent,names_consent,deletion_token_hash,source,names_expires_at)
+ values(v_session,'admin-test',true,true,encode(extensions.gen_random_bytes(32),'hex'),coalesce(nullif(p_record->>'source',''),'manual_test'),now()+interval '30 days') on conflict do nothing;
+ insert into flames.attempts(attempt_id,session_id,parent_attempt_id,name_one,name_two,result_letter,remaining_count,is_alternative,previous_result_letter,algorithm_version,source)
+ values(v_attempt,v_session,nullif(p_record->>'parent_attempt_id','')::uuid,left(p_record->>'name_one',120),left(p_record->>'name_two',120),
+   nullif(p_record->>'result_letter',''),(p_record->>'remaining_count')::int,coalesce((p_record->>'is_alternative')::boolean,false),
+   nullif(p_record->>'previous_result_letter',''),coalesce(nullif(p_record->>'algorithm_version',''),'1.1.0'),coalesce(nullif(p_record->>'source',''),'manual_test'));
+ insert into flames.feedback(attempt_id,liked_result,wants_change,desired_letter)
+ values(v_attempt,(p_record->>'liked_result')::boolean,coalesce((p_record->>'wants_change')::boolean,false),nullif(p_record->>'desired_letter',''));
+ return jsonb_build_object('session_id',v_session,'attempt_id',v_attempt,'stored',true);
+end $$;
+
+revoke all on all tables in schema flames from public, anon, authenticated;
+revoke all on all sequences in schema flames from public, anon, authenticated;
+revoke all on all functions in schema flames from public, anon, authenticated;
+grant usage on schema flames to anon;
+grant execute on function flames.ingest_attempt(uuid,uuid,uuid,timestamptz,text,boolean,text,text,text,text,integer,boolean,text,text,jsonb) to anon;
+grant execute on function flames.record_feedback(uuid,uuid,boolean,boolean,text) to anon;
+grant execute on function flames.delete_session_data(uuid,text) to anon;
+grant execute on function flames.admin_dashboard(text,jsonb) to anon;
+grant execute on function flames.admin_insert_test(text,jsonb) to anon;
+
+insert into hub.app_resources(app_id,resource_type,resource_name,resource_schema,is_shared,notes)
+select a.id,r.t,r.n,'flames',false,'FLAMES central research data'
+from hub.apps a cross join (values
+ ('schema','flames'),('table','sessions'),('table','attempts'),('table','feedback'),('table','name_variations'),('table','deletion_requests'),
+ ('rpc','ingest_attempt'),('rpc','record_feedback'),('rpc','delete_session_data'),('rpc','admin_dashboard'),('rpc','admin_insert_test'),('rpc','enforce_retention')) r(t,n)
+where a.slug='flames'
+on conflict do nothing;
+
+insert into hub.schema_versions(app_id,migration_key,notes)
+select id,'202610250001_flames_central_data','Central consent-based storage, private analytics RPCs and retention metadata'
+from hub.apps where slug='flames'
+on conflict do nothing;
+) or p_admin_token_hash is distinct from (select config_value from flames.app_config where config_key='admin_token_hash') then
+    raise exception 'unauthorized';
+  end if;
+  v_from:=coalesce((p_query->>'from')::timestamptz,now()-interval '30 days');
+  v_to:=coalesce((p_query->>'to')::timestamptz,now()+interval '1 day');
+  v_source:=nullif(p_query->>'source',''); v_search:=nullif(lower(trim(p_query->>'search')),'');
+  v_page:=greatest(coalesce((p_query->>'page')::int,1),1); v_size:=least(greatest(coalesce((p_query->>'page_size')::int,50),1),200);
+  return jsonb_build_object(
+   'metrics',(select jsonb_build_object('attempts',count(*),'sessions',count(distinct a.session_id),
+     'liked',count(*) filter(where f.liked_result is true),'disliked',count(*) filter(where f.liked_result is false),
+     'alternatives',count(*) filter(where a.is_alternative),'changed_outcomes',count(*) filter(where a.is_alternative and a.previous_result_letter is distinct from a.result_letter),
+     'alternative_session_percent',round(100.0*count(distinct a.session_id) filter(where a.is_alternative)/nullif(count(distinct a.session_id),0),1),
+     'attempts_per_session',round(count(*)::numeric/nullif(count(distinct a.session_id),0),2))
+     from flames.attempts a left join flames.feedback f using(attempt_id) where a.created_at between v_from and v_to and (v_source is null or a.source=v_source)),
+   'distribution',(select coalesce(jsonb_object_agg(coalesce(result_letter,'tie'),n),'{}'::jsonb) from (select result_letter,count(*) n from flames.attempts where created_at between v_from and v_to and (v_source is null or source=v_source) group by result_letter)d),
+   'rows',(select coalesce(jsonb_agg(to_jsonb(x) order by x.created_at desc),'[]'::jsonb) from (
+     select a.attempt_id,a.session_id,a.parent_attempt_id,a.created_at,a.name_one,a.name_two,a.result_letter,a.remaining_count,
+       a.is_alternative,a.previous_result_letter,a.algorithm_version,a.source,f.liked_result,f.wants_change,f.desired_letter
+     from flames.attempts a left join flames.feedback f using(attempt_id)
+     where a.created_at between v_from and v_to and (v_source is null or a.source=v_source)
+       and (v_search is null or lower(coalesce(a.name_one,'')||' '||coalesce(a.name_two,'')||' '||a.session_id::text) like '%'||v_search||'%')
+     order by a.created_at desc offset (v_page-1)*v_size limit v_size)x),
+   'page',v_page,'page_size',v_size);
+end $$;
+
+create or replace function flames.admin_insert_test(p_admin_token_hash text,p_record jsonb)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,flames as $$
+declare v_session uuid:=coalesce((p_record->>'session_id')::uuid,gen_random_uuid()); v_attempt uuid:=coalesce((p_record->>'attempt_id')::uuid,gen_random_uuid());
+begin
+ perform flames.enforce_retention();
+ if p_admin_token_hash is null or p_admin_token_hash !~ '^[0-9a-f]{64} then raise exception 'unauthorized'; end if;
+ insert into flames.sessions(session_id,consent_version,analytics_consent,names_consent,deletion_token_hash,source,names_expires_at)
+ values(v_session,'admin-test',true,true,encode(extensions.gen_random_bytes(32),'hex'),coalesce(nullif(p_record->>'source',''),'manual_test'),now()+interval '30 days') on conflict do nothing;
+ insert into flames.attempts(attempt_id,session_id,parent_attempt_id,name_one,name_two,result_letter,remaining_count,is_alternative,previous_result_letter,algorithm_version,source)
+ values(v_attempt,v_session,nullif(p_record->>'parent_attempt_id','')::uuid,left(p_record->>'name_one',120),left(p_record->>'name_two',120),
+   nullif(p_record->>'result_letter',''),(p_record->>'remaining_count')::int,coalesce((p_record->>'is_alternative')::boolean,false),
+   nullif(p_record->>'previous_result_letter',''),coalesce(nullif(p_record->>'algorithm_version',''),'1.1.0'),coalesce(nullif(p_record->>'source',''),'manual_test'));
+ insert into flames.feedback(attempt_id,liked_result,wants_change,desired_letter)
+ values(v_attempt,(p_record->>'liked_result')::boolean,coalesce((p_record->>'wants_change')::boolean,false),nullif(p_record->>'desired_letter',''));
+ return jsonb_build_object('session_id',v_session,'attempt_id',v_attempt,'stored',true);
+end $$;
+
+revoke all on all tables in schema flames from public, anon, authenticated;
+revoke all on all sequences in schema flames from public, anon, authenticated;
+revoke all on all functions in schema flames from public, anon, authenticated;
+grant usage on schema flames to anon;
+grant execute on function flames.ingest_attempt(uuid,uuid,uuid,timestamptz,text,boolean,text,text,text,text,integer,boolean,text,text,jsonb) to anon;
+grant execute on function flames.record_feedback(uuid,uuid,boolean,boolean,text) to anon;
+grant execute on function flames.delete_session_data(uuid,text) to anon;
+grant execute on function flames.admin_dashboard(text,jsonb) to anon;
+grant execute on function flames.admin_insert_test(text,jsonb) to anon;
+
+insert into hub.app_resources(app_id,resource_type,resource_name,resource_schema,is_shared,notes)
+select a.id,r.t,r.n,'flames',false,'FLAMES central research data'
+from hub.apps a cross join (values
+ ('schema','flames'),('table','sessions'),('table','attempts'),('table','feedback'),('table','name_variations'),('table','deletion_requests'),
+ ('rpc','ingest_attempt'),('rpc','record_feedback'),('rpc','delete_session_data'),('rpc','admin_dashboard'),('rpc','admin_insert_test'),('rpc','enforce_retention')) r(t,n)
+where a.slug='flames'
+on conflict do nothing;
+
+insert into hub.schema_versions(app_id,migration_key,notes)
+select id,'202610250001_flames_central_data','Central consent-based storage, private analytics RPCs and retention metadata'
+from hub.apps where slug='flames'
+on conflict do nothing;
+ or not exists (select 1 from flames.app_config where config_key='admin_token_hash' and config_value ~ '^[0-9a-f]{64} then raise exception 'unauthorized'; end if;
+ insert into flames.sessions(session_id,consent_version,analytics_consent,names_consent,deletion_token_hash,source,names_expires_at)
+ values(v_session,'admin-test',true,true,encode(extensions.gen_random_bytes(32),'hex'),coalesce(nullif(p_record->>'source',''),'manual_test'),now()+interval '30 days') on conflict do nothing;
+ insert into flames.attempts(attempt_id,session_id,parent_attempt_id,name_one,name_two,result_letter,remaining_count,is_alternative,previous_result_letter,algorithm_version,source)
+ values(v_attempt,v_session,nullif(p_record->>'parent_attempt_id','')::uuid,left(p_record->>'name_one',120),left(p_record->>'name_two',120),
+   nullif(p_record->>'result_letter',''),(p_record->>'remaining_count')::int,coalesce((p_record->>'is_alternative')::boolean,false),
+   nullif(p_record->>'previous_result_letter',''),coalesce(nullif(p_record->>'algorithm_version',''),'1.1.0'),coalesce(nullif(p_record->>'source',''),'manual_test'));
+ insert into flames.feedback(attempt_id,liked_result,wants_change,desired_letter)
+ values(v_attempt,(p_record->>'liked_result')::boolean,coalesce((p_record->>'wants_change')::boolean,false),nullif(p_record->>'desired_letter',''));
+ return jsonb_build_object('session_id',v_session,'attempt_id',v_attempt,'stored',true);
+end $$;
+
+revoke all on all tables in schema flames from public, anon, authenticated;
+revoke all on all sequences in schema flames from public, anon, authenticated;
+revoke all on all functions in schema flames from public, anon, authenticated;
+grant usage on schema flames to anon;
+grant execute on function flames.ingest_attempt(uuid,uuid,uuid,timestamptz,text,boolean,text,text,text,text,integer,boolean,text,text,jsonb) to anon;
+grant execute on function flames.record_feedback(uuid,uuid,boolean,boolean,text) to anon;
+grant execute on function flames.delete_session_data(uuid,text) to anon;
+grant execute on function flames.admin_dashboard(text,jsonb) to anon;
+grant execute on function flames.admin_insert_test(text,jsonb) to anon;
+
+insert into hub.app_resources(app_id,resource_type,resource_name,resource_schema,is_shared,notes)
+select a.id,r.t,r.n,'flames',false,'FLAMES central research data'
+from hub.apps a cross join (values
+ ('schema','flames'),('table','sessions'),('table','attempts'),('table','feedback'),('table','name_variations'),('table','deletion_requests'),
+ ('rpc','ingest_attempt'),('rpc','record_feedback'),('rpc','delete_session_data'),('rpc','admin_dashboard'),('rpc','admin_insert_test'),('rpc','enforce_retention')) r(t,n)
+where a.slug='flames'
+on conflict do nothing;
+
+insert into hub.schema_versions(app_id,migration_key,notes)
+select id,'202610250001_flames_central_data','Central consent-based storage, private analytics RPCs and retention metadata'
+from hub.apps where slug='flames'
+on conflict do nothing;
+) or p_admin_token_hash is distinct from (select config_value from flames.app_config where config_key='admin_token_hash') then raise exception 'unauthorized'; end if;
  insert into flames.sessions(session_id,consent_version,analytics_consent,names_consent,deletion_token_hash,source,names_expires_at)
  values(v_session,'admin-test',true,true,encode(extensions.gen_random_bytes(32),'hex'),coalesce(nullif(p_record->>'source',''),'manual_test'),now()+interval '30 days') on conflict do nothing;
  insert into flames.attempts(attempt_id,session_id,parent_attempt_id,name_one,name_two,result_letter,remaining_count,is_alternative,previous_result_letter,algorithm_version,source)
