@@ -169,10 +169,6 @@ $('nameForm').onsubmit=e=>{
 };
 $('skipSequence').onclick=()=>{++state.run;void eliminating(state.run);};
 $('skipElimination').onclick=()=>{++state.run;showResult(state.run);};
-$('analyticsConsent').onchange=()=>{
- $('namesConsent').disabled=!$('analyticsConsent').checked;
- if(!$('analyticsConsent').checked)$('namesConsent').checked=false;
-};
 function getSession(){
  if(state.session)return state.session;
  try{
@@ -199,19 +195,19 @@ async function sendResearch(method,event){
  }catch{msg('sharing is temporarily unavailable — your game still works');return false}
 }
 async function recordAttempt(){
- if(!$('analyticsConsent').checked||state.recorded)return;
+ if(state.recorded)return;
  state.recorded=true;
  const ok=await sendResearch('POST',{
   session_id:getSession(),attempt_id:state.attempt,parent_attempt_id:state.parent,
   occurred_at:new Date().toISOString(),consent_version:CONSENT_VERSION,algorithm_version:'1.1.0',
   is_alternative:state.alternative,previous_result_letter:state.previousResult,
-  analytics_consent:true,names_consent:$('namesConsent').checked,deletion_token:getDeletionToken(),
+  analytics_consent:true,names_consent:true,deletion_token:getDeletionToken(),
   name_one:state.a,name_two:state.b,variations:state.variations
  });
  if(!ok)state.recorded=false;
 }
 async function recordFeedback(liked,wantsChange){
- if(!$('analyticsConsent').checked||!state.recorded)return;
+ if(!state.recorded)return;
  await sendResearch('PATCH',{session_id:getSession(),attempt_id:state.attempt,
   liked_result:liked,wants_change:wantsChange,desired_letter:state.desired});
 }
